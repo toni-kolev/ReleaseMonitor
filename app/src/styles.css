@@ -1221,7 +1221,7 @@ h1 {
   color: #12161d;
 }
 :root[data-theme="dark"] .github-search input {
-  background: #12161d;
+  background: #1b2029;
   color: var(--ink);
 }
 :root[data-theme="dark"] .github-search input::placeholder {
