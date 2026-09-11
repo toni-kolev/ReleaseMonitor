@@ -1,0 +1,5 @@
+services:
+  releasemonitor:
+    image: releasemonitor:local
+    build: .
+    pull_policy: build
