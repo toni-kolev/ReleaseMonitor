@@ -19,15 +19,37 @@ Simple standalone page to track the releases of your favourite repositories and 
 ## 🚀 Get started with Docker compose
 Requires Docker Engine or Docker Desktop with Docker Compose v2. No source checkout or Node.js installation is needed. The image becomes available after the first release is published and its GHCR package is made public.
 
-### Step 1: Download the Compose file
+### Step 1: Create the Compose file
 
-Download [compose.yaml](https://raw.githubusercontent.com/toni-kolev/ReleaseMonitor/main/compose.yaml) into an empty directory, then open a terminal there:
+In an empty directory, create a file named `compose.yaml` with the following contents:
 
-```sh
-curl -fLO https://raw.githubusercontent.com/toni-kolev/ReleaseMonitor/main/compose.yaml
+```yaml
+services:
+  releasemonitor:
+    image: ghcr.io/toni-kolev/releasemonitor:${IMAGE_TAG:-latest}
+    ports:
+      - "127.0.0.1:${PORT:-6972}:3000"
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      CODEBERG_TOKEN: ${CODEBERG_TOKEN:-}
+      SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-60}
+    volumes:
+      - release-data:/data
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  release-data:
 ```
 
-On Windows PowerShell, use `curl.exe` instead of `curl`.
+Open a terminal in that directory for the next step.
 
 ### Step 2: Start the container
 
