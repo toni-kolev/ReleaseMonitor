@@ -28,7 +28,7 @@ services:
   releasemonitor:
     image: ghcr.io/toni-kolev/releasemonitor:${IMAGE_TAG:-latest}
     ports:
-      - "127.0.0.1:${PORT:-6972}:3000"
+      - "${PORT:-6972}:3000"
     environment:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       CODEBERG_TOKEN: ${CODEBERG_TOKEN:-}
