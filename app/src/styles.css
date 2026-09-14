@@ -1051,13 +1051,15 @@ h1 {
 }
 .provider-selector {
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .provider-selector button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-width: 112px;
+  flex: 1;
+  min-width: 0;
   min-height: 36px;
 }
 .github-search {

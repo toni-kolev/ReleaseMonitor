@@ -4,11 +4,20 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 type Kind = "major" | "minor" | "patch" | "pre-release" | "other";
-type Provider = "github" | "codeberg";
+type Provider = "github" | "gitlab" | "codeberg";
 const providers = {
   github: { label: "GitHub", icon: "github" },
+  gitlab: { label: "GitLab", icon: "gitlab" },
   codeberg: { label: "Codeberg", icon: "git" },
 } as const;
+
+function repositoryName(fullName: string) {
+  const segments = fullName.split("/");
+  return {
+    owner: segments.slice(0, -1).join("/"),
+    name: segments.at(-1) ?? fullName,
+  };
+}
 type Repository = {
   id: number;
   provider: Provider;
@@ -290,8 +299,8 @@ export default function App() {
                   <img src={repo.avatarUrl} width="26" height="26" alt="" />
                   <Icon name={providers[repo.provider].icon} size={13} />
                   <span className="repository-name">
-                    <strong>{repo.fullName.split("/")[1]}</strong>
-                    <small>{repo.fullName.split("/")[0]}</small>
+                    <strong>{repositoryName(repo.fullName).name}</strong>
+                    <small>{repositoryName(repo.fullName).owner}</small>
                   </span>
                   {repo.error ? (
                     <Icon name="exclamation-circle" size={14} className="error-color" />
@@ -399,7 +408,7 @@ export default function App() {
                 {String(repositories.length).padStart(2, "0")}
                 <span>repositories</span>
               </div>
-              <span className="stat-foot">GitHub &amp; Codeberg</span>
+              <span className="stat-foot">GitHub, GitLab &amp; Codeberg</span>
             </div>
             <div className="stat">
               <div className="stat-label">
@@ -491,7 +500,7 @@ export default function App() {
               <div className="stream-title">
                 <h2>
                   {currentRepo
-                    ? currentRepo.fullName.split("/")[1]
+                    ? repositoryName(currentRepo.fullName).name
                     : "Release feed"}
                 </h2>
                 <span className="feed-total mono">{filtered.length}</span>
@@ -657,7 +666,7 @@ export default function App() {
               RELEASEMONITOR <span className="muted">/</span> SHARED WORKSPACE
             </span>
             <span>
-              <span className="status-dot" /> GITHUB &amp; CODEBERG
+              <span className="status-dot" /> GITHUB, GITLAB &amp; CODEBERG
             </span>
           </footer>
         </main>

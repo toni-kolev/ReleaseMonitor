@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { createStore } from "./store.mjs";
 import { createGithub } from "./github.mjs";
 import { createCodeberg } from "./codeberg.mjs";
+import { createGitlab } from "./gitlab.mjs";
 import { createApp } from "./app.mjs";
 
 const intervalMinutes = Number(process.env.SYNC_INTERVAL_MINUTES || 60);
@@ -12,7 +13,8 @@ const store = createStore(
 );
 const github = createGithub({ token: process.env.GITHUB_TOKEN });
 const codeberg = createCodeberg({ token: process.env.CODEBERG_TOKEN });
-const { app, syncAll } = createApp({ store, github, codeberg, intervalMinutes });
+const gitlab = createGitlab({ token: process.env.GITLAB_TOKEN });
+const { app, syncAll } = createApp({ store, github, codeberg, gitlab, intervalMinutes });
 const server = app.listen(Number(process.env.PORT || 3000), "0.0.0.0", () => {
   console.log(`ReleaseMonitor listening on port ${process.env.PORT || 3000}`);
   void syncAll();

@@ -4,10 +4,18 @@ import { rateLimit } from "express-rate-limit";
 import { resolve } from "node:path";
 import { ApiError } from "./github.mjs";
 
+const namePatterns = {
+  github: /^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}\/[a-zA-Z0-9_.-]{1,100}$/,
+  codeberg: /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}\/[a-zA-Z0-9_.-]{1,100}$/,
+  // GitLab allows nested groups: group/sub/project
+  gitlab: /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}(\/[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}){1,10}$/,
+};
+
 export function createApp({
   store,
   github,
   codeberg,
+  gitlab,
   intervalMinutes = 60,
   dist = resolve("dist"),
 }) {
@@ -18,7 +26,8 @@ export function createApp({
   function client(provider = "github") {
     if (provider === "github" && github) return github;
     if (provider === "codeberg" && codeberg) return codeberg;
-    throw new ApiError("Choose GitHub or Codeberg as the provider.", 400);
+    if (provider === "gitlab" && gitlab) return gitlab;
+    throw new ApiError("Choose GitHub, GitLab, or Codeberg as the provider.", 400);
   }
   app.disable("x-powered-by");
   app.use(
@@ -119,13 +128,12 @@ export function createApp({
     const fullName = req.body?.fullName;
     const provider = req.body?.provider ?? "github";
     const source = client(provider);
-    const namePattern = provider === "codeberg"
-      ? /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}\/[a-zA-Z0-9_.-]{1,100}$/
-      : /^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}\/[a-zA-Z0-9_.-]{1,100}$/;
+    const namePattern = namePatterns[provider];
     if (
       typeof fullName !== "string" ||
-      !namePattern.test(fullName) ||
-      [".", ".."].includes(fullName.split("/")[1])
+      fullName.length > 255 ||
+      !namePattern?.test(fullName) ||
+      fullName.split("/").some((part) => [".", ".."].includes(part))
     ) {
       throw new ApiError("Use a valid owner/repository name.", 400);
     }

@@ -14,6 +14,7 @@ type IconName =
   | "download"
   | "exclamation-circle"
   | "github"
+  | "gitlab"
   | "git"
   | "inbox"
   | "layers"

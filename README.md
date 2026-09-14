@@ -14,6 +14,7 @@ Simple standalone page to track the releases of your favourite repositories and 
 
 ### Supported sources:
 - GitHub
+- GitLab
 - Codeberg
 
 ## 🚀 Get started with Docker compose
@@ -31,6 +32,7 @@ services:
       - "${PORT:-6972}:3000"
     environment:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
       CODEBERG_TOKEN: ${CODEBERG_TOKEN:-}
       SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-60}
     volumes:
@@ -59,7 +61,7 @@ docker compose up -d
 
 ### Step 3: Open ReleaseMonitor
 
-Open http://localhost:6972 and select **Add repository**, then choose **GitHub** or **Codeberg**. Searches use the selected provider's public repository API through the backend.
+Open http://localhost:6972 and select **Add repository**, then choose **GitHub**, **GitLab**, or **Codeberg**. Searches use the selected provider's public repository API through the backend.
 
 
 ### Updates and data
@@ -82,11 +84,12 @@ An optional `.env` file beside `compose.yaml` accepts the settings shown in [.en
 | --- | --- | --- |
 | `PORT` | `6972` | Host port |
 | `IMAGE_TAG` | `latest` | Published image version, for example `1.0.0` |
-| `SYNC_INTERVAL_MINUTES` | `60` | Polling interval for both providers, minimum 5 minutes |
+| `SYNC_INTERVAL_MINUTES` | `60` | Polling interval for all providers, minimum 5 minutes |
 | `GITHUB_TOKEN` | empty | Optional server-side GitHub token for higher API limits |
+| `GITLAB_TOKEN` | empty | Optional server-side GitLab token for higher API limits |
 | `CODEBERG_TOKEN` | empty | Optional server-side Codeberg API token |
 
-No GitHub token is required. Unauthenticated GitHub REST requests typically allow 60 requests/hour per outgoing IP, and repository search has a separate, lower limit. A server-side token is recommended for larger watchlists or frequent refreshes. Use a token with only public-repository read access; it is never sent to the browser. GitHub rate limits and outages are shown in the interface without discarding cached releases.
+No GitHub, GitLab, or Codeberg token is required. Unauthenticated GitHub REST requests typically allow 60 requests/hour per outgoing IP, and repository search has a separate, lower limit. GitLab.com allows unauthenticated public project and release reads, with a lower per-IP rate limit than authenticated traffic. A server-side token is recommended for larger watchlists or frequent refreshes. Use a token with only public-repository read access; it is never sent to the browser. Rate limits and outages are shown in the interface without discarding cached releases.
 
 ### 👉 How to get GitHub access token
 1. Go to **GitHub**
@@ -98,6 +101,15 @@ No GitHub token is required. Unauthenticated GitHub REST requests typically allo
 7. Check `public_repo` scope
 8. Generate and set in `.env` file
 
+### 👉 How to get GitLab access token
+1. Go to **GitLab**
+2. Open **Preferences** from your avatar menu
+3. Go to **Access tokens**
+4. Click **Add new token**
+5. Set an expiration date
+6. Check the `read_api` scope
+7. Create the token and set it in the `.env` file
+
 ### 👉 How to get Codeberg access token
 1. Go to **Codeberg**
 2. Go to **Settings**
@@ -106,6 +118,6 @@ No GitHub token is required. Unauthenticated GitHub REST requests typically allo
 5. Check **Public only** from **Repository and organizations access**
 6. Select **Read** from **repository** dropdown
 
-Each repository starts with up to 100 recent releases, excluding drafts and unpublished entries. Hourly polling uses conditional requests for GitHub and paginated requests for Codeberg, retaining previously fetched releases; this is not a complete historical import. Repositories publishing more than 100 releases between successful polls can have gaps. Private repositories are excluded. The watchlist is capped at 50 repositories across both providers. Manual refresh has a one-minute cooldown. Existing databases are automatically migrated while preserving GitHub repositories, cached releases, and read state; repository names and upstream IDs can overlap between providers.
+Each repository starts with up to 100 recent releases, excluding drafts, unpublished GitHub/Codeberg entries, and GitLab upcoming releases. Hourly polling uses conditional requests for GitHub and GitLab and paginated requests for Codeberg, retaining previously fetched releases; this is not a complete historical import. Repositories publishing more than 100 releases between successful polls can have gaps. Private and GitLab internal repositories are excluded. The watchlist is capped at 50 repositories across all providers. Manual refresh has a one-minute cooldown. Existing databases are automatically migrated while preserving GitHub repositories, cached releases, and read state; repository names and upstream IDs can overlap between providers. GitLab nested groups (`group/sub/project`) are supported.
 
 Major/minor/patch labels classify the tag's semantic version (`2.0.0`, `2.1.0`, `2.1.1`), not a computed upgrade delta or a guarantee about breaking changes. Non-semver tags are labeled Other. Pre-releases are explicitly separated. Release notes render Markdown without raw HTML; remote embedded images are exposed as links.

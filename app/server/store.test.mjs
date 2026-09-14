@@ -43,18 +43,22 @@ test("provider IDs and identical names coexist without sharing review state", ()
   try {
     const github = store.add({ id: 1, fullName: "owner/project" });
     const codeberg = store.add({ id: 1, fullName: "owner/project", provider: "codeberg" });
+    const gitlab = store.add({ id: 1, fullName: "owner/project", provider: "gitlab" });
     assert.notEqual(github.id, codeberg.id);
+    assert.notEqual(github.id, gitlab.id);
     const release = { id: 10, publishedAt: "2026-09-01T00:00:00Z" };
     store.sync(github.id, [release]);
     store.sync(codeberg.id, [release]);
+    store.sync(gitlab.id, [{ ...release, id: "v1.0.0" }]);
     const githubRelease = store.releases().find((item) => item.repositoryId === github.id);
     store.review(githubRelease.id, true);
     store.sync(codeberg.id, [{ ...release, title: "Codeberg update" }]);
-    assert.equal(store.releases().length, 2);
+    assert.equal(store.releases().length, 3);
     assert.equal(store.releases().find((item) => item.repositoryId === codeberg.id).reviewed, false);
     store.remove(codeberg.id);
-    assert.equal(store.releases()[0].reviewed, true);
-    assert.equal(store.repositories()[0].provider, "github");
+    assert.equal(store.releases().find((item) => item.repositoryId === github.id).reviewed, true);
+    assert.equal(store.repositories().some((item) => item.provider === "gitlab"), true);
+    assert.equal(store.repositories().some((item) => item.provider === "codeberg"), false);
   } finally {
     store.close();
   }

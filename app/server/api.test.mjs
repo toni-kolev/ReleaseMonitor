@@ -4,6 +4,7 @@ import { createStore } from "./store.mjs";
 import { createApp } from "./app.mjs";
 import { createGithub, releaseData } from "./github.mjs";
 import { createCodeberg } from "./codeberg.mjs";
+import { createGitlab } from "./gitlab.mjs";
 
 test("Codeberg adapter maps public repositories and paginated releases with optional authentication", async () => {
   const calls = [];
@@ -55,6 +56,97 @@ test("Codeberg rejects private repositories and reports upstream failures", asyn
     });
   }
   const offline = createCodeberg({ fetcher: async () => { throw new Error("Network error"); } });
+  await assert.rejects(() => offline.search("project"), /Cached releases are still available/);
+});
+
+test("GitLab adapter maps public nested projects, tag-keyed releases and rate limits", async () => {
+  const calls = [];
+  const project = {
+    id: 24,
+    path_with_namespace: "group/sub/project",
+    description: "GitLab project",
+    star_count: 7,
+    visibility: "public",
+    web_url: "https://gitlab.com/group/sub/project",
+    avatar_url: "/uploads/avatar.png",
+    namespace: { avatar_url: "https://gitlab.com/uploads/group.png" },
+  };
+  const release = {
+    tag_name: "v1.2.3",
+    name: "1.2.3",
+    description: "Notes",
+    released_at: "2026-09-01T00:00:00Z",
+    author: { username: "alice" },
+    assets: { links: [{ name: "app.zip", direct_asset_url: "https://gitlab.com/download", url: "https://gitlab.com/link" }] },
+  };
+  const gitlab = createGitlab({
+    token: "test-token",
+    fetcher: async (url, options) => {
+      calls.push({ url, options });
+      if (url.includes("/search") || url.includes("search="))
+        return Response.json([project, { ...project, visibility: "private" }]);
+      if (url.includes("/releases"))
+        return Response.json([release, { ...release, tag_name: "next", upcoming_release: true }]);
+      return Response.json(project);
+    },
+  });
+  const results = await gitlab.search("group project");
+  assert.equal(results.length, 1);
+  assert.equal(results[0].provider, "gitlab");
+  assert.equal(results[0].fullName, "group/sub/project");
+  assert.equal(results[0].stars, 7);
+  assert.equal(results[0].avatarUrl, "https://gitlab.com/uploads/avatar.png");
+  assert.match(calls[0].url, /search=group%20project/);
+  assert.match(calls[0].url, /visibility=public/);
+  assert.equal(calls[0].options.headers["PRIVATE-TOKEN"], "test-token");
+  assert.equal((await gitlab.repository("group/sub/project")).url, project.web_url);
+  assert.match(calls.at(-1).url, /projects\/group%2Fsub%2Fproject$/);
+  const fetched = await gitlab.releases({ fullName: "group/sub/project", url: project.web_url, etag: "cached" });
+  assert.equal(fetched.releases.length, 1);
+  assert.equal(fetched.releases[0].id, "v1.2.3");
+  assert.equal(fetched.releases[0].kind, "patch");
+  assert.equal(fetched.releases[0].author, "alice");
+  assert.equal(fetched.releases[0].assets[0].url, "https://gitlab.com/download");
+  assert.equal(fetched.releases[0].url, "https://gitlab.com/group/sub/project/-/releases/v1.2.3");
+  assert.equal(calls.at(-1).options.headers["If-None-Match"], "cached");
+  const unchanged = createGitlab({
+    fetcher: async () => new Response(null, { status: 304 }),
+  });
+  assert.deepEqual(await unchanged.releases({ fullName: "owner/project", etag: "cached" }), {
+    releases: [],
+    etag: "cached",
+  });
+  let requests = 0;
+  const limited = createGitlab({
+    fetcher: async (_, options) => {
+      requests++;
+      assert.equal(options.headers["PRIVATE-TOKEN"], undefined);
+      return new Response(null, { status: 429, headers: { "retry-after": "120" } });
+    },
+  });
+  await assert.rejects(() => limited.search("test"), /rate limit/);
+  await assert.rejects(() => limited.search("test"), /rate limit/);
+  assert.equal(requests, 1);
+});
+
+test("GitLab rejects non-public projects and reports upstream failures", async () => {
+  const privateRepo = createGitlab({ fetcher: async () => Response.json({ visibility: "private" }) });
+  await assert.rejects(() => privateRepo.repository("owner/private"), /Only public/);
+  const internalRepo = createGitlab({ fetcher: async () => Response.json({ visibility: "internal" }) });
+  await assert.rejects(() => internalRepo.repository("owner/internal"), /Only public/);
+  for (const [status, message, expectedStatus] of [
+    [401, /GitLab token is invalid/, 502],
+    [404, /Public repository not found/, 404],
+    [500, /GitLab returned HTTP 500/, 502],
+  ]) {
+    const gitlab = createGitlab({ fetcher: async () => new Response(null, { status }) });
+    await assert.rejects(() => gitlab.repository("owner/project"), (error) => {
+      assert.match(error.message, message);
+      assert.equal(error.status, expectedStatus);
+      return true;
+    });
+  }
+  const offline = createGitlab({ fetcher: async () => { throw new Error("Network error"); } });
   await assert.rejects(() => offline.search("project"), /Cached releases are still available/);
 });
 
@@ -165,47 +257,62 @@ test("API supports a shared feed, validates writes, and keeps cached releases on
   }
 });
 
-test("API routes both providers independently and rejects unknown providers", async () => {
+test("API routes all providers independently and rejects unknown providers", async () => {
   const store = createStore(":memory:");
   const repo = { id: 42, fullName: "owner/project" };
   const calls = [];
   let codebergOffline = false;
   const adapter = (provider) => ({
     search: async () => [{ ...repo, provider }],
-    repository: async () => ({ ...repo, provider }),
+    repository: async (fullName) => ({
+      ...repo,
+      id: fullName === repo.fullName ? 42 : 43,
+      fullName,
+      provider,
+    }),
     releases: async () => {
       calls.push(provider);
       if (provider === "codeberg" && codebergOffline) throw new Error("Codeberg unavailable");
       return { releases: [{ id: 10, publishedAt: "2026-09-01T00:00:00Z" }] };
     },
   });
-  const { app, syncAll } = createApp({ store, github: adapter("github"), codeberg: adapter("codeberg") });
+  const { app, syncAll } = createApp({
+    store,
+    github: adapter("github"),
+    codeberg: adapter("codeberg"),
+    gitlab: adapter("gitlab"),
+  });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const add = (provider) => fetch(`${base}/repositories`, {
+  const add = (provider, fullName = repo.fullName) => fetch(`${base}/repositories`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fullName: repo.fullName, provider }),
+    body: JSON.stringify({ fullName, provider }),
   });
   try {
     assert.equal((await fetch(`${base}/search?q=project&provider=unknown`)).status, 400);
     assert.equal((await add("unknown")).status, 400);
     const results = await (await fetch(`${base}/search?q=project&provider=codeberg`)).json();
     assert.equal(results.repositories[0].provider, "codeberg");
+    assert.equal((await fetch(`${base}/search?q=project&provider=gitlab`)).status, 200);
     assert.equal((await add("github")).status, 201);
     assert.equal((await add("codeberg")).status, 201);
-    assert.equal((await add("codeberg")).status, 200);
-    assert.equal(store.repositories().length, 2);
-    assert.equal(store.releases().length, 2);
-    assert.deepEqual(calls, ["github", "codeberg"]);
+    assert.equal((await add("gitlab")).status, 201);
+    assert.equal((await add("gitlab")).status, 200);
+    assert.equal((await add("gitlab", "group/sub/project")).status, 201);
+    assert.equal((await add("github", "group/sub/project")).status, 400);
+    assert.equal(store.repositories().length, 4);
+    assert.equal(store.releases().length, 4);
+    assert.deepEqual(calls, ["github", "codeberg", "gitlab", "gitlab"]);
     await syncAll();
-    assert.equal(calls.length, 4);
-    assert.equal(store.releases().length, 2);
+    assert.equal(calls.length, 8);
+    assert.equal(store.releases().length, 4);
     codebergOffline = true;
     await syncAll();
-    assert.equal(store.releases().length, 2);
+    assert.equal(store.releases().length, 4);
     assert.equal(store.repositories().find((item) => item.provider === "codeberg").error, "Codeberg unavailable");
     assert.equal(store.repositories().find((item) => item.provider === "github").error, null);
+    assert.equal(store.repositories().find((item) => item.provider === "gitlab" && item.fullName === "owner/project").error, null);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     store.close();

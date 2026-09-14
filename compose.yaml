@@ -5,6 +5,7 @@ services:
       - "${PORT:-6972}:3000"
     environment:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
       CODEBERG_TOKEN: ${CODEBERG_TOKEN:-}
       SYNC_INTERVAL_MINUTES: ${SYNC_INTERVAL_MINUTES:-60}
     volumes:
