@@ -1,6 +1,6 @@
 <center>
 
-![](https://i.imgur.com/VdXqN8D.png)
+![](./screenshots/readme-logo.png)
 
 
 # ReleaseMonitor
@@ -8,7 +8,7 @@
 Simple standalone page to track the releases of your favourite repositories and show them as a feed.
 
 
-![](./screenshots/dark-light.gif)
+![](./screenshots/light.png)
 
 </center>
 
