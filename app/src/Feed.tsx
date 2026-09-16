@@ -232,7 +232,7 @@ export default function App() {
             <Icon name="activity" size={22} />
           </span>
           <span>
-            Release<span className="brand-light">Monitor</span>
+            Release<span className="brand-period">.</span><span className="brand-light">Monitor</span>
           </span>
         </a>
         <div className="topbar-meta">
@@ -378,7 +378,7 @@ export default function App() {
               <p className="heading-subtitle">
                 {currentRepo
                   ? currentRepo.fullName
-                  : "Your open-source stack, up to date."}
+                  : `${repositories.length} repositories / ${unread} releases awaiting review`}
               </p>
             </div>
             <div className="heading-actions">
@@ -705,7 +705,7 @@ function ReleaseCard({
     }
   }
   return (
-    <article className={`release-card ${release.reviewed ? "reviewed" : ""}`}>
+    <article className={`release-card release-${release.kind} ${release.reviewed ? "reviewed" : ""}`}>
       <div className="release-top">
         <div className="release-repository">
           <img src={repository.avatarUrl} alt="" width="24" height="24" />
