@@ -105,12 +105,14 @@ No GitHub, GitLab, or Codeberg token is required. Unauthenticated GitHub REST re
 
 ### 👉 How to get GitLab access token
 1. Go to **GitLab**
-2. Open **Preferences** from your avatar menu
-3. Go to **Access tokens**
-4. Click **Add new token**
-5. Set an expiration date
-6. Check the `read_api` scope
-7. Create the token and set it in the `.env` file
+2. Open **User Settings** from your avatar menu
+3. Go to **Access**
+4. Go to **Personal access tokens**
+5. Click **Generate token**
+6. Select **Legacy token**
+7. Set an expiration date
+8. Check the `read_api` scope
+9. Create the token and set it in the `.env` file
 
 ### 👉 How to get Codeberg access token
 1. Go to **Codeberg**
