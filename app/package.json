@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node --watch server/index.mjs",
-    "start": "node server/index.mjs",
+    "server": "node --env-file-if-exists=../.env --watch server/index.mjs",
+    "start": "node --env-file-if-exists=../.env server/index.mjs",
     "test": "node --test server/*.test.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",

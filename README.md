@@ -80,6 +80,8 @@ Data persists in the `release-data` named volume. Stop the app and back up the v
 
 An optional `.env` file beside `compose.yaml` accepts the settings shown in [.env.example](.env.example):
 
+Local Node startup (`npm --prefix app run server` or `npm --prefix app start`) also loads this file. Existing environment variables take precedence. Restart the backend and Vite dev server after changing `.env`; Vite's API proxy follows the configured `PORT` (or `3000` when unset). For Docker, apply changes with `docker compose up -d`; restarting an existing container does not update its environment.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PORT` | `6972` | Host port |
