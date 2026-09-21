@@ -363,6 +363,16 @@ export default function App() {
               </a> project
               &copy; {new Date().getFullYear()} {" "}
             </p>
+
+            <p className="sidebar-copyright">
+              <a
+                href="https://github.com/toni-kolev/ReleaseMonitor"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span aria-hidden="true" className="app-icon bi bi-github"></span> GitHub
+              </a>
+            </p>
           </footer>
         </aside>
 
