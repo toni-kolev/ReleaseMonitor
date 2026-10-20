@@ -11,6 +11,34 @@ const namePatterns = {
   gitlab: /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}(\/[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}){1,10}$/,
 };
 
+const providerHosts = {
+  github: "github.com",
+  codeberg: "codeberg.org",
+  gitlab: "gitlab.com",
+};
+
+function repositoryUrlName(query, provider) {
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(query);
+  if (!hasScheme && !/^(github\.com|codeberg\.org|gitlab\.com)\//i.test(query))
+    return null;
+  let url;
+  try {
+    url = new URL(hasScheme ? query : `https://${query}`);
+  } catch {
+    throw new ApiError("Use a valid repository URL.", 400);
+  }
+  const fullName = url.pathname.replace(/\/$/, "").replace(/^\//, "").replace(/\.git$/, "");
+  if (
+    !["https:", "http:"].includes(url.protocol) ||
+    url.host !== providerHosts[provider] ||
+    url.username || url.password ||
+    !namePatterns[provider]?.test(fullName) ||
+    fullName.split("/").some((part) => [".", ".."].includes(part))
+  )
+    throw new ApiError("Use a repository URL matching the selected provider.", 400);
+  return fullName;
+}
+
 export function createApp({
   store,
   github,
@@ -122,7 +150,19 @@ export function createApp({
     const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
     if (query.length < 2 || query.length > 120)
       throw new ApiError("Enter between 2 and 120 characters.", 400);
-    res.json({ repositories: await client(req.query.provider).search(query) });
+    const provider = req.query.provider ?? "github";
+    const source = client(provider);
+    const fullName = repositoryUrlName(query, provider);
+    if (fullName) {
+      try {
+        return res.json({ repositories: [await source.repository(fullName)] });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404)
+          return res.json({ repositories: [] });
+        throw error;
+      }
+    }
+    res.json({ repositories: await source.search(query) });
   });
   app.post("/api/repositories", writeLimit, async (req, res) => {
     const fullName = req.body?.fullName;

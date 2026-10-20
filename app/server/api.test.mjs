@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createStore } from "./store.mjs";
 import { createApp } from "./app.mjs";
-import { createGithub, releaseData } from "./github.mjs";
+import { ApiError, createGithub, releaseData } from "./github.mjs";
 import { createCodeberg } from "./codeberg.mjs";
 import { createGitlab } from "./gitlab.mjs";
 
@@ -185,6 +185,61 @@ test("GitHub adapter handles public search, ETags, classification and rate limit
   await assert.rejects(() => limited.search("react"), /rate limit/);
   await assert.rejects(() => limited.search("react"), /rate limit/);
   assert.equal(requests, 1);
+});
+
+test("API resolves repository URLs exactly without text search", async () => {
+  const store = createStore(":memory:");
+  const calls = [];
+  const adapter = (provider) => ({
+    repository: async (fullName) => {
+      calls.push([provider, "repository", fullName]);
+      if (fullName === "owner/missing") throw new ApiError("Public repository not found.", 404);
+      if (fullName === "owner/limited") throw new ApiError("Rate limit reached.", 429);
+      return { id: 1, provider, fullName };
+    },
+    search: async (query) => {
+      calls.push([provider, "search", query]);
+      return [];
+    },
+  });
+  const { app } = createApp({
+    store,
+    github: adapter("github"),
+    codeberg: adapter("codeberg"),
+    gitlab: adapter("gitlab"),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api/search`;
+  const search = (query, provider = "github") =>
+    fetch(`${base}?${new URLSearchParams({ q: query, provider })}`);
+  try {
+    for (const [query, provider, fullName] of [
+      ["https://github.com/D4Vinci/Scrapling", "github", "D4Vinci/Scrapling"],
+      ["https://github.com/D4Vinci/Scrapling.git/?tab=readme#intro", "github", "D4Vinci/Scrapling"],
+      ["github.com/D4Vinci/Scrapling", "github", "D4Vinci/Scrapling"],
+      ["https://codeberg.org/owner/project/", "codeberg", "owner/project"],
+      ["https://gitlab.com/group/sub/project", "gitlab", "group/sub/project"],
+    ]) {
+      const response = await search(query, provider);
+      assert.equal(response.status, 200);
+      assert.deepEqual((await response.json()).repositories, [{ id: 1, provider, fullName }]);
+      assert.deepEqual(calls.at(-1), [provider, "repository", fullName]);
+    }
+    assert.equal((await search("scraping library")).status, 200);
+    assert.deepEqual(calls.at(-1), ["github", "search", "scraping library"]);
+    assert.equal((await search("https://gitlab.com/owner/project")).status, 400);
+    assert.equal((await search("https://github.com/owner/project/issues")).status, 400);
+    assert.equal(calls.length, 6);
+    const missing = await search("https://github.com/owner/missing");
+    assert.equal(missing.status, 200);
+    assert.deepEqual(await missing.json(), { repositories: [] });
+    assert.equal((await search("https://github.com/owner/limited")).status, 429);
+    assert.equal(calls.filter((call) => call[1] === "search").length, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    store.close();
+  }
 });
 
 test("API supports a shared feed, validates writes, and keeps cached releases on failure", async () => {
