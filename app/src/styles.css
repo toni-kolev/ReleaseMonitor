@@ -407,6 +407,16 @@ img {
 .sidebar-copyright a:hover {
   color: var(--blue);
 }
+.sidebar-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  color: var(--muted);
+}
+.sidebar-github:hover {
+  color: var(--blue);
+}
 .mobile-menu {
   display: none !important;
 }
